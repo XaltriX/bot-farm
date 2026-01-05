@@ -613,6 +613,53 @@ async def global_reply_shortcut(update: Update, context: ContextTypes.DEFAULT_TY
     )
 
 
+async def delete_reply(update: Update, context: ContextTypes.DEFAULT_TYPE):
+    """Delete bot reply - choose mode"""
+    if not is_admin(update.effective_user.id):
+        await update.message.reply_text("⛔ Unauthorized")
+        return
+    
+    keyboard = [
+        [InlineKeyboardButton("🌐 Delete Global Reply", callback_data="del_global")],
+        [InlineKeyboardButton("🎯 Delete Bot Reply", callback_data="del_bot")],
+    ]
+    
+    await update.message.reply_text(
+        "🗑️ *Delete Reply*\n\nChoose what to delete:",
+        reply_markup=InlineKeyboardMarkup(keyboard),
+        parse_mode="Markdown"
+    )
+
+
+async def handle_delete_reply(update: Update, context: ContextTypes.DEFAULT_TYPE):
+    """Handle delete action"""
+    query = update.callback_query
+    await query.answer()
+    
+    if query.data == "del_global":
+        await db.db.global_replies.delete_one({"reply_id": "global_default"})
+        await query.edit_message_text("✅ Global reply deleted!")
+    
+    elif query.data == "del_bot":
+        bots = await db.get_all_bots()
+        if not bots:
+            await query.edit_message_text("❌ No bots found")
+            return
+        
+        keyboard = [[InlineKeyboardButton(f"@{b['bot_username']}", callback_data=f"delbot_{b['bot_id']}")] for b in bots[:15]]
+        await query.edit_message_text("Select bot:", reply_markup=InlineKeyboardMarkup(keyboard))
+
+
+async def handle_delete_bot_reply(update: Update, context: ContextTypes.DEFAULT_TYPE):
+    """Delete specific bot reply"""
+    query = update.callback_query
+    await query.answer()
+    
+    bot_id = query.data.replace("delbot_", "")
+    await db.db.bots.update_one({"bot_id": bot_id}, {"$set": {"auto_reply": None, "use_global_reply": True}})
+    await query.edit_message_text("✅ Bot reply deleted! Now using global reply.")
+
+
 # ==================== CANCEL ====================
 
 async def cancel(update: Update, context: ContextTypes.DEFAULT_TYPE):
