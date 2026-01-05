@@ -1,0 +1,143 @@
+version: '3.8'
+
+services:
+  # MongoDB
+  mongodb:
+    image: mongo:7.0
+    container_name: bot_farm_mongodb
+    restart: always
+    ports:
+      - "27017:27017"
+    volumes:
+      - mongodb_data:/data/db
+    environment:
+      MONGO_INITDB_DATABASE: bot_farm
+    networks:
+      - bot_farm_network
+
+  # Redis
+  redis:
+    image: redis:7.2-alpine
+    container_name: bot_farm_redis
+    restart: always
+    ports:
+      - "6379:6379"
+    volumes:
+      - redis_data:/data
+    command: redis-server --appendonly yes
+    networks:
+      - bot_farm_network
+
+  # Admin Bot
+  admin_bot:
+    build:
+      context: .
+      dockerfile: Dockerfile.admin
+    container_name: bot_farm_admin
+    restart: always
+    env_file:
+      - .env
+    depends_on:
+      - mongodb
+      - redis
+    networks:
+      - bot_farm_network
+
+  # Worker 1
+  worker1:
+    build:
+      context: .
+      dockerfile: Dockerfile.worker
+    container_name: bot_farm_worker1
+    restart: always
+    environment:
+      - WORKER_NAME=worker-1
+      - WEBHOOK_PORT=8000
+    env_file:
+      - .env
+    depends_on:
+      - mongodb
+      - redis
+    networks:
+      - bot_farm_network
+
+  # Worker 2
+  worker2:
+    build:
+      context: .
+      dockerfile: Dockerfile.worker
+    container_name: bot_farm_worker2
+    restart: always
+    environment:
+      - WORKER_NAME=worker-2
+      - WEBHOOK_PORT=8000
+    env_file:
+      - .env
+    depends_on:
+      - mongodb
+      - redis
+    networks:
+      - bot_farm_network
+
+  # Worker 3
+  worker3:
+    build:
+      context: .
+      dockerfile: Dockerfile.worker
+    container_name: bot_farm_worker3
+    restart: always
+    environment:
+      - WORKER_NAME=worker-3
+      - WEBHOOK_PORT=8000
+    env_file:
+      - .env
+    depends_on:
+      - mongodb
+      - redis
+    networks:
+      - bot_farm_network
+
+  # Worker 4
+  worker4:
+    build:
+      context: .
+      dockerfile: Dockerfile.worker
+    container_name: bot_farm_worker4
+    restart: always
+    environment:
+      - WORKER_NAME=worker-4
+      - WEBHOOK_PORT=8000
+    env_file:
+      - .env
+    depends_on:
+      - mongodb
+      - redis
+    networks:
+      - bot_farm_network
+
+  # Nginx Reverse Proxy
+  nginx:
+    image: nginx:alpine
+    container_name: bot_farm_nginx
+    restart: always
+    ports:
+      - "80:80"
+      - "443:443"
+    volumes:
+      - ./nginx.conf:/etc/nginx/conf.d/default.conf
+      - ./ssl:/etc/nginx/ssl
+    depends_on:
+      - worker1
+      - worker2
+      - worker3
+      - worker4
+    networks:
+      - bot_farm_network
+
+volumes:
+  mongodb_data:
+  redis_data:
+
+networks:
+  bot_farm_network:
+    driver: bridge
